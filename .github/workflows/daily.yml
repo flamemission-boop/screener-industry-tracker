@@ -1,33 +1,25 @@
 name: Daily Screener Industry Tracker
-
 on:
   schedule:
-    - cron: "30 0 * * *"   # 6:00 AM IST
+    - cron: "30 0 * * 2-6"   # 6:00 AM IST on Tue-Sat (day 2-6)
   workflow_dispatch:
-
 jobs:
   scrape:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
-
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
-        playwright install chromium
-
+        playwright install --with-deps chromium
     - name: Scrape data
       run: python scrape.py
-
     - name: Generate dashboard
       run: python generate_dashboard.py
-
     - name: Commit & push
       run: |
         git config --global user.name "github-actions"
