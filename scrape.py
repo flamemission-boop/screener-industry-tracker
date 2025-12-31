@@ -24,23 +24,42 @@ def scrape():
             )
         )
         page = context.new_page()
-        page.goto(URL, wait_until="networkidle", timeout=60000)
         
-        page.wait_for_selector("button:has-text('Industry')")
-        page.click("button:has-text('Industry')")
-        page.wait_for_timeout(800)
+        try:
+            page.goto(URL, wait_until="networkidle", timeout=60000)
+        except Exception as e:
+            browser.close()
+            raise Exception(f"Failed to load page: {str(e)}")
         
-        page.wait_for_selector("div[role='menu'] label")
-        items = page.locator("div[role='menu'] label").all()
-        
-        rows = []
-        for item in items:
-            text = item.inner_text().strip()
-            if "-" in text:
-                industry, count = text.rsplit("-", 1)
-                rows.append([TODAY, industry.strip(), int(count.strip())])
+        try:
+            page.wait_for_selector("button:has-text('Industry')", timeout=15000)
+            page.click("button:has-text('Industry')")
+            
+            page.wait_for_timeout(2000)
+            
+            try:
+                page.wait_for_selector("div[role='menu'] label", timeout=15000)
+                items = page.locator("div[role='menu'] label").all()
+            except:
+                page.wait_for_selector("label input[type='checkbox']", timeout=15000)
+                items = page.locator("label:has(input[type='checkbox'])").all()
+            
+            rows = []
+            for item in items:
+                text = item.inner_text().strip()
+                if "-" in text:
+                    industry, count = text.rsplit("-", 1)
+                    rows.append([TODAY, industry.strip(), int(count.strip())])
+            
+        except Exception as e:
+            page.screenshot(path="debug_screenshot.png")
+            browser.close()
+            raise Exception(f"Failed to scrape industry data: {str(e)}")
         
         browser.close()
+        
+        if not rows:
+            raise Exception("No industry data found on the page")
         
         file_exists = os.path.isfile(DATA_FILE)
         with open(DATA_FILE, "a", newline="", encoding="utf-8") as f:
@@ -48,8 +67,6 @@ def scrape():
             if not file_exists:
                 writer.writerow(["date", "industry", "count"])
             writer.writerows(rows)
-        
-        print(f"Scraped {len(rows)} industries on {TODAY}")
 
 if __name__ == "__main__":
     scrape()
