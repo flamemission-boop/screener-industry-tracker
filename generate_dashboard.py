@@ -41,16 +41,19 @@ fig.update_layout(
     hovermode="x unified",
     legend_title="Industry",
     height=700,
-    margin=dict(t=150, b=100, l=80, r=80),
+    margin=dict(t=150, b=80, l=80, r=80),
     xaxis=dict(
         rangeselector=dict(
             buttons=list([
-                dict(count=7, label="Last Week", step="day", stepmode="backward"),
-                dict(count=1, label="Last Month", step="month", stepmode="backward"),
-                dict(count=3, label="Last Quarter", step="month", stepmode="backward"),
-                dict(count=6, label="Last 6 Months", step="month", stepmode="backward"),
-                dict(count=1, label="Last Year", step="year", stepmode="backward"),
-                dict(step="all", label="All Time")
+                dict(count=7, label="1W", step="day", stepmode="backward"),
+                dict(count=14, label="2W", step="day", stepmode="backward"),
+                dict(count=21, label="3W", step="day", stepmode="backward"),
+                dict(count=1, label="1M", step="month", stepmode="backward"),
+                dict(count=3, label="3M", step="month", stepmode="backward"),
+                dict(count=6, label="6M", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
+                dict(count=1, label="1Y", step="year", stepmode="backward"),
+                dict(step="all", label="All")
             ]),
             bgcolor="lightgray",
             activecolor="steelblue",
@@ -60,7 +63,7 @@ fig.update_layout(
             yanchor="bottom",
             font=dict(size=11)
         ),
-        rangeslider=dict(visible=True),
+        rangeslider=dict(visible=False),
         type="date",
         tickformat="%Y-%m-%d",
         dtick=86400000
@@ -72,5 +75,3 @@ fig.write_html(
     include_plotlyjs="cdn",
     full_html=True
 )
-
-print("✓ Dashboard generated with date range selector")
