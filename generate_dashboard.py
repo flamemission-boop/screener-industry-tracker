@@ -66,9 +66,9 @@ df = df[df["count"].notna() & (df["count"] > 0)]
 df["total_in_sector"] = df["industry"].map(SECTOR_TOTALS)
 df["percentage"] = (df["count"] / df["total_in_sector"]) * 100
 
-# Get top 10 industries by average percentage for cleaner visualization
-top_industries = df.groupby("industry")["percentage"].mean().nlargest(10).index
-df_filtered = df[df["industry"].isin(top_industries)]
+# Filter to only show industries with percentage > 25%
+df_filtered = df[df["percentage"] > 25]
+top_industries = df_filtered["industry"].unique()
 
 # Create figure
 fig = go.Figure()
