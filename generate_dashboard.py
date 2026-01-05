@@ -49,12 +49,6 @@ SECTOR_TOTALS = {
     "Personal Products": 10,
     "Media": 10,
     "Non - Ferrous Metals": 10,
-    "Minerals & Mining": 9,
-    "Healthcare Equipment & Supplies": 8,
-    "IT - Hardware": 8,
-    "Household Products": 7,
-    "Financial Technology (Fintech)": 7,
-    "Diversified": 7,
 }
 
 df = pd.read_csv("data/industry_data.csv")
