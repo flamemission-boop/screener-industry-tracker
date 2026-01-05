@@ -133,8 +133,295 @@ fig.update_layout(
     )
 )
 
-fig.write_html(
-    "docs/index.html",
-    include_plotlyjs="cdn",
-    full_html=True
-)
+chart_html = fig.to_html(include_plotlyjs="cdn", full_html=False)
+
+# Calculate rising sectors for different timeframes
+def calculate_changes(df, days):
+    latest_date = df["date"].max()
+    
+    if days is None:
+        # YTD calculation
+        target_date = datetime(latest_date.year, 1, 1).date()
+    else:
+        target_date = latest_date - timedelta(days=days)
+    
+    closest_date = df[df["date"] <= target_date]["date"].max()
+    
+    if pd.isna(closest_date):
+        return pd.Series(dtype=float)
+    
+    latest_data = df[df["date"] == latest_date][["industry", "percentage"]].set_index("industry")
+    previous_data = df[df["date"] == closest_date][["industry", "percentage"]].set_index("industry")
+    
+    changes = latest_data.join(previous_data, lsuffix="_latest", rsuffix="_previous")
+    changes["change"] = changes["percentage_latest"] - changes["percentage_previous"]
+    return changes["change"]
+
+timeframes = [
+    ("1W", 7),
+    ("2W", 14),
+    ("1M", 30),
+    ("3M", 90),
+    ("6M", 180),
+    ("YTD", None),
+    ("1Y", 365),
+]
+
+change_data = {}
+for label, days in timeframes:
+    result = calculate_changes(df, days)
+    if not result.empty:
+        change_data[label] = result
+
+if change_data:
+    change_df = pd.DataFrame(change_data)
+    change_df = change_df.dropna(how="all")
+    sort_col = "1W" if "1W" in change_df.columns else change_df.columns[0]
+    change_df = change_df.sort_values(sort_col, ascending=False, na_position="last")
+else:
+    change_df = pd.DataFrame()
+
+def get_cell_color(val):
+    if pd.isna(val):
+        return "#f5f5f5"
+    if val > 0:
+        intensity = min(val / 30, 1)
+        r = int(255 - (intensity * 55))
+        g = 255
+        b = int(255 - (intensity * 55))
+        return f"rgb({r}, {g}, {b})"
+    elif val < 0:
+        intensity = min(abs(val) / 30, 1)
+        r = 255
+        g = int(255 - (intensity * 55))
+        b = int(255 - (intensity * 55))
+        return f"rgb({r}, {g}, {b})"
+    return "#f5f5f5"
+
+def format_cell_content(val):
+    if pd.isna(val):
+        return '<span style="color: #999;">N/A</span>'
+    if val > 0:
+        return f'<span style="color: #166534;">+{val:.1f}%</span>'
+    elif val < 0:
+        return f'<span style="color: #991b1b;">{val:.1f}%</span>'
+    return '<span>0.0%</span>'
+
+def format_cell(val):
+    if pd.isna(val):
+        return '<td style="background-color: #f5f5f5; color: #999; text-align: center;">N/A</td>'
+    
+    if val > 0:
+        intensity = min(val / 30, 1)
+        r = int(255 - (intensity * 55))
+        g = 255
+        b = int(255 - (intensity * 55))
+        color = f"rgb({r}, {g}, {b})"
+        text = f"+{val:.1f}%"
+    elif val < 0:
+        intensity = min(abs(val) / 30, 1)
+        r = 255
+        g = int(255 - (intensity * 55))
+        b = int(255 - (intensity * 55))
+        color = f"rgb({r}, {g}, {b})"
+        text = f"{val:.1f}%"
+    else:
+        color = "#f5f5f5"
+        text = "0.0%"
+    
+    return f'<td style="background-color: {color}; text-align: center; font-weight: 500;">{text}</td>'
+
+if not change_df.empty:
+    available_timeframes = [(label, days) for label, days in timeframes if label in change_df.columns]
+    
+    table_rows = []
+    for industry in change_df.index:
+        cells = "".join([f'<td data-value="{change_df.loc[industry, label] if not pd.isna(change_df.loc[industry, label]) else ""}">{format_cell_content(change_df.loc[industry, label])}</td>' for label, _ in available_timeframes])
+        table_rows.append(f'<tr><td class="industry-cell">{industry}</td>{cells}</tr>')
+    
+    header_cells = "".join([f'<th class="sortable" data-col="{i+1}">{label} <span class="sort-arrow">⇅</span></th>' for i, (label, _) in enumerate(available_timeframes)])
+    
+    table_html = f"""
+<div style="margin-top: 40px; font-family: Arial, sans-serif;">
+    <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Rising & Falling Sectors by Timeframe</h2>
+    <p style="text-align: center; color: #666; margin-bottom: 20px;">Change in % of stocks at 52-week high (click column headers to sort)</p>
+    <table id="sector-table" style="width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <thead>
+            <tr style="background-color: #4a5568; color: white;">
+                <th class="sortable" data-col="0">Sector <span class="sort-arrow">⇅</span></th>
+                {header_cells}
+            </tr>
+        </thead>
+        <tbody>
+            {"".join(table_rows)}
+        </tbody>
+    </table>
+</div>
+"""
+else:
+    table_html = """
+<div style="margin-top: 40px; font-family: Arial, sans-serif;">
+    <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Rising & Falling Sectors by Timeframe</h2>
+    <p style="text-align: center; color: #999;">Not enough historical data to calculate changes.</p>
+</div>
+"""
+
+full_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>52-Week High Stocks by Industry</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #fafafa;
+        }}
+        #sector-table tbody tr:nth-child(even) {{
+            background-color: rgba(0,0,0,0.02);
+        }}
+        #sector-table tbody tr:hover {{
+            background-color: rgba(0,0,0,0.05);
+        }}
+        #sector-table td, #sector-table th {{
+            border-bottom: 1px solid #e2e8f0;
+        }}
+        #sector-table th.sortable {{
+            cursor: pointer;
+            user-select: none;
+            padding: 12px;
+            text-align: center;
+            transition: background-color 0.2s;
+        }}
+        #sector-table th.sortable:first-child {{
+            text-align: left;
+        }}
+        #sector-table th.sortable:hover {{
+            background-color: #5a6878;
+        }}
+        #sector-table th .sort-arrow {{
+            margin-left: 5px;
+            opacity: 0.5;
+        }}
+        #sector-table th.sorted-asc .sort-arrow::after {{
+            content: "↑";
+        }}
+        #sector-table th.sorted-desc .sort-arrow::after {{
+            content: "↓";
+        }}
+        #sector-table th.sorted-asc .sort-arrow,
+        #sector-table th.sorted-desc .sort-arrow {{
+            opacity: 1;
+        }}
+        #sector-table td {{
+            padding: 8px 12px;
+            text-align: center;
+            font-weight: 500;
+        }}
+        #sector-table td.industry-cell {{
+            text-align: left;
+        }}
+    </style>
+</head>
+<body>
+    {chart_html}
+    {table_html}
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {{
+        const table = document.getElementById('sector-table');
+        if (!table) return;
+        
+        const headers = table.querySelectorAll('th.sortable');
+        let currentSort = {{ col: null, dir: null }};
+        
+        headers.forEach(header => {{
+            header.addEventListener('click', function() {{
+                const colIndex = parseInt(this.dataset.col);
+                const isNumeric = colIndex > 0;
+                
+                // Determine sort direction
+                let dir = 'desc';
+                if (currentSort.col === colIndex) {{
+                    dir = currentSort.dir === 'desc' ? 'asc' : 'desc';
+                }}
+                
+                // Update header classes
+                headers.forEach(h => {{
+                    h.classList.remove('sorted-asc', 'sorted-desc');
+                    h.querySelector('.sort-arrow').textContent = '⇅';
+                }});
+                this.classList.add(dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+                this.querySelector('.sort-arrow').textContent = dir === 'asc' ? '↑' : '↓';
+                
+                // Sort rows
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                
+                rows.sort((a, b) => {{
+                    let aVal, bVal;
+                    
+                    if (isNumeric) {{
+                        aVal = a.cells[colIndex].dataset.value;
+                        bVal = b.cells[colIndex].dataset.value;
+                        aVal = aVal === '' ? -Infinity : parseFloat(aVal);
+                        bVal = bVal === '' ? -Infinity : parseFloat(bVal);
+                    }} else {{
+                        aVal = a.cells[colIndex].textContent.trim();
+                        bVal = b.cells[colIndex].textContent.trim();
+                    }}
+                    
+                    if (aVal < bVal) return dir === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return dir === 'asc' ? 1 : -1;
+                    return 0;
+                }});
+                
+                rows.forEach(row => tbody.appendChild(row));
+                currentSort = {{ col: colIndex, dir: dir }};
+                
+                // Re-apply row colors after sorting
+                applyRowColors();
+            }});
+        }});
+        
+        function applyRowColors() {{
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach((row, index) => {{
+                // Apply cell background colors based on data-value
+                Array.from(row.cells).forEach((cell, cellIndex) => {{
+                    if (cellIndex > 0) {{
+                        const val = parseFloat(cell.dataset.value);
+                        if (isNaN(val) || cell.dataset.value === '') {{
+                            cell.style.backgroundColor = '#f5f5f5';
+                        }} else if (val > 0) {{
+                            const intensity = Math.min(val / 30, 1);
+                            const r = Math.round(255 - (intensity * 55));
+                            const g = 255;
+                            const b = Math.round(255 - (intensity * 55));
+                            cell.style.backgroundColor = `rgb(${{r}}, ${{g}}, ${{b}})`;
+                        }} else if (val < 0) {{
+                            const intensity = Math.min(Math.abs(val) / 30, 1);
+                            const r = 255;
+                            const g = Math.round(255 - (intensity * 55));
+                            const b = Math.round(255 - (intensity * 55));
+                            cell.style.backgroundColor = `rgb(${{r}}, ${{g}}, ${{b}})`;
+                        }} else {{
+                            cell.style.backgroundColor = '#f5f5f5';
+                        }}
+                    }}
+                }});
+            }});
+        }}
+        
+        // Initial color application
+        applyRowColors();
+    }});
+    </script>
+</body>
+</html>
+"""
+
+with open("docs/index.html", "w", encoding="utf-8") as f:
+    f.write(full_html)
