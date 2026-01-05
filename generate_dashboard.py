@@ -5,6 +5,52 @@ import os
 
 os.makedirs("docs", exist_ok=True)
 
+SECTOR_URLS = {
+    "Aerospace & Defense": "https://www.screener.in/market/IN07/IN0702/IN070201/",
+    "Agricultural Food & other Products": "https://www.screener.in/market/IN04/IN0401/IN040101/",
+    "Agricultural, Commercial & Construction Vehicles": "https://www.screener.in/market/IN07/IN0702/IN070202/",
+    "Auto Components": "https://www.screener.in/market/IN02/IN0201/IN020102/",
+    "Automobiles": "https://www.screener.in/market/IN02/IN0201/IN020101/",
+    "Banks": "https://www.screener.in/market/IN05/IN0501/IN050102/",
+    "Beverages": "https://www.screener.in/market/IN04/IN0401/IN040102/",
+    "Capital Markets": "https://www.screener.in/market/IN05/IN0501/IN050103/",
+    "Cement & Cement Products": "https://www.screener.in/market/IN01/IN0102/IN010203/",
+    "Chemicals & Petrochemicals": "https://www.screener.in/market/IN01/IN0101/IN010101/",
+    "Commercial Services & Supplies": "https://www.screener.in/market/IN09/IN0901/IN090104/",
+    "Construction": "https://www.screener.in/market/IN07/IN0701/IN070101/",
+    "Consumer Durables": "https://www.screener.in/market/IN02/IN0202/IN020201/",
+    "Electrical Equipment": "https://www.screener.in/market/IN07/IN0702/IN070203/",
+    "Entertainment": "https://www.screener.in/market/IN02/IN0204/IN020402/",
+    "Ferrous Metals": "https://www.screener.in/market/IN01/IN0103/IN010301/",
+    "Fertilizers & Agrochemicals": "https://www.screener.in/market/IN01/IN0101/IN010102/",
+    "Finance": "https://www.screener.in/market/IN05/IN0501/IN050101/",
+    "Food Products": "https://www.screener.in/market/IN04/IN0401/IN040104/",
+    "Gas": "https://www.screener.in/market/IN03/IN0301/IN030101/",
+    "Healthcare Services": "https://www.screener.in/market/IN06/IN0601/IN060103/",
+    "Industrial Manufacturing": "https://www.screener.in/market/IN07/IN0702/IN070204/",
+    "Industrial Products": "https://www.screener.in/market/IN07/IN0702/IN070205/",
+    "Insurance": "https://www.screener.in/market/IN05/IN0501/IN050104/",
+    "IT - Services": "https://www.screener.in/market/IN08/IN0801/IN080102/",
+    "IT - Software": "https://www.screener.in/market/IN08/IN0801/IN080101/",
+    "Leisure Services": "https://www.screener.in/market/IN02/IN0206/IN020601/",
+    "Media": "https://www.screener.in/market/IN02/IN0204/IN020401/",
+    "Non - Ferrous Metals": "https://www.screener.in/market/IN01/IN0103/IN010302/",
+    "Oil": "https://www.screener.in/market/IN03/IN0301/IN030102/",
+    "Other Consumer Services": "https://www.screener.in/market/IN02/IN0206/IN020602/",
+    "Other Utilities": "https://www.screener.in/market/IN11/IN1102/IN110201/",
+    "Paper, Forest & Jute Products": "https://www.screener.in/market/IN01/IN0104/IN010401/",
+    "Personal Products": "https://www.screener.in/market/IN04/IN0401/IN040105/",
+    "Petroleum Products": "https://www.screener.in/market/IN03/IN0301/IN030103/",
+    "Pharmaceuticals & Biotechnology": "https://www.screener.in/market/IN06/IN0601/IN060101/",
+    "Power": "https://www.screener.in/market/IN11/IN1101/IN110101/",
+    "Realty": "https://www.screener.in/market/IN02/IN0205/IN020501/",
+    "Retailing": "https://www.screener.in/market/IN02/IN0206/IN020603/",
+    "Telecom - Services": "https://www.screener.in/market/IN10/IN1001/IN100101/",
+    "Textiles & Apparels": "https://www.screener.in/market/IN02/IN0203/IN020301/",
+    "Transport Infrastructure": "https://www.screener.in/market/IN09/IN0901/IN090103/",
+    "Transport Services": "https://www.screener.in/market/IN09/IN0901/IN090102/",
+}
+
 SECTOR_TOTALS = {
     "Industrial Products": 159,
     "Finance": 127,
@@ -225,13 +271,17 @@ def format_cell(val):
     
     return f'<td style="background-color: {color}; text-align: center; font-weight: 500;">{text}</td>'
 
+def get_sector_link(industry):
+    url = SECTOR_URLS.get(industry, "#")
+    return f'<a href="{url}" target="_blank" class="sector-link">{industry}</a>'
+
 if not change_df.empty:
     available_timeframes = [(label, days) for label, days in timeframes if label in change_df.columns]
     
     table_rows = []
     for industry in change_df.index:
         cells = "".join([f'<td data-value="{change_df.loc[industry, label] if not pd.isna(change_df.loc[industry, label]) else ""}">{format_cell_content(change_df.loc[industry, label])}</td>' for label, _ in available_timeframes])
-        table_rows.append(f'<tr><td class="industry-cell">{industry}</td>{cells}</tr>')
+        table_rows.append(f'<tr><td class="industry-cell">{get_sector_link(industry)}</td>{cells}</tr>')
     
     header_cells = "".join([f'<th class="sortable" data-col="{i+1}">{label} <span class="sort-arrow">⇅</span></th>' for i, (label, _) in enumerate(available_timeframes)])
     
@@ -316,6 +366,15 @@ full_html = f"""
         }}
         #sector-table td.industry-cell {{
             text-align: left;
+        }}
+        .sector-link {{
+            color: #2563eb;
+            text-decoration: none;
+            transition: color 0.2s;
+        }}
+        .sector-link:hover {{
+            color: #1d4ed8;
+            text-decoration: underline;
         }}
     </style>
 </head>
