@@ -242,10 +242,10 @@ def format_cell_content(val):
     if pd.isna(val):
         return '<span style="color: #999;">N/A</span>'
     if val > 0:
-        return f'<span style="color: #166534;">+{val:.1f}%</span>'
+        return f'<span style="color: #166534;">+{val:.1f}pp</span>'
     elif val < 0:
-        return f'<span style="color: #991b1b;">{val:.1f}%</span>'
-    return '<span>0.0%</span>'
+        return f'<span style="color: #991b1b;">{val:.1f}pp</span>'
+    return '<span>0.0pp</span>'
 
 def format_cell(val):
     if pd.isna(val):
@@ -257,17 +257,17 @@ def format_cell(val):
         g = 255
         b = int(255 - (intensity * 55))
         color = f"rgb({r}, {g}, {b})"
-        text = f"+{val:.1f}%"
+        text = f"+{val:.1f}pp"
     elif val < 0:
         intensity = min(abs(val) / 30, 1)
         r = 255
         g = int(255 - (intensity * 55))
         b = int(255 - (intensity * 55))
         color = f"rgb({r}, {g}, {b})"
-        text = f"{val:.1f}%"
+        text = f"{val:.1f}pp"
     else:
         color = "#f5f5f5"
-        text = "0.0%"
+        text = "0.0pp"
     
     return f'<td style="background-color: {color}; text-align: center; font-weight: 500;">{text}</td>'
 
