@@ -175,6 +175,10 @@ fig.update_layout(
 
 chart_html = fig.to_html(include_plotlyjs="cdn", full_html=False)
 
+# Get current percentage for each industry
+latest_date = df["date"].max()
+current_data = df[df["date"] == latest_date][["industry", "percentage"]].set_index("industry")
+
 # Calculate rising sectors for different timeframes
 def calculate_changes(df, days):
     latest_date = df["date"].max()
@@ -216,7 +220,11 @@ for label, days in timeframes:
 if change_data:
     change_df = pd.DataFrame(change_data)
     change_df = change_df.dropna(how="all")
-    sort_col = "1W" if "1W" in change_df.columns else change_df.columns[0]
+    
+    # Add current percentage column
+    change_df.insert(0, "Current %", current_data["percentage"])
+    
+    sort_col = "1W" if "1W" in change_df.columns else change_df.columns[1]
     change_df = change_df.sort_values(sort_col, ascending=False, na_position="last")
 else:
     change_df = pd.DataFrame()
@@ -238,9 +246,13 @@ def get_cell_color(val):
         return f"rgb({r}, {g}, {b})"
     return "#f5f5f5"
 
-def format_cell_content(val):
+def format_cell_content(val, is_current=False):
     if pd.isna(val):
         return '<span style="color: #999;">N/A</span>'
+    
+    if is_current:
+        return f'<span style="color: #333;">{val:.1f}%</span>'
+    
     if val > 0:
         return f'<span style="color: #166534;">+{val:.1f}pp</span>'
     elif val < 0:
@@ -276,24 +288,32 @@ def get_sector_link(industry):
     return f'<a href="{url}" target="_blank" class="sector-link">{industry}</a>'
 
 if not change_df.empty:
-    available_timeframes = [(label, days) for label, days in timeframes if label in change_df.columns]
+    available_columns = change_df.columns.tolist()
     
     table_rows = []
     for industry in change_df.index:
-        cells = "".join([f'<td data-value="{change_df.loc[industry, label] if not pd.isna(change_df.loc[industry, label]) else ""}">{format_cell_content(change_df.loc[industry, label])}</td>' for label, _ in available_timeframes])
-        table_rows.append(f'<tr><td class="industry-cell">{get_sector_link(industry)}</td>{cells}</tr>')
+        cells = []
+        for i, col in enumerate(available_columns):
+            val = change_df.loc[industry, col]
+            is_current = (col == "Current %")
+            cells.append(f'<td data-value="{val if not pd.isna(val) else ""}" class="{"current-cell" if is_current else ""}">{format_cell_content(val, is_current)}</td>')
+        
+        table_rows.append(f'<tr><td class="industry-cell">{get_sector_link(industry)}</td>{"".join(cells)}</tr>')
     
-    header_cells = "".join([f'<th class="sortable" data-col="{i+1}">{label} <span class="sort-arrow">⇅</span></th>' for i, (label, _) in enumerate(available_timeframes)])
+    header_cells = []
+    for i, col in enumerate(available_columns):
+        is_current = (col == "Current %")
+        header_cells.append(f'<th class="sortable {"current-header" if is_current else ""}" data-col="{i+1}">{col} <span class="sort-arrow">⇅</span></th>')
     
     table_html = f"""
 <div style="margin-top: 40px; font-family: Arial, sans-serif;">
     <h2 style="text-align: center; color: #333; margin-bottom: 20px;">Rising & Falling Sectors by Timeframe</h2>
-    <p style="text-align: center; color: #666; margin-bottom: 20px;">Change in % of stocks at 52-week high (click column headers to sort)</p>
-    <table id="sector-table" style="width: 100%; max-width: 900px; margin: 0 auto; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+    <p style="text-align: center; color: #666; margin-bottom: 20px;">Current % of stocks at 52-week high and changes in percentage points (pp) | Click column headers to sort</p>
+    <table id="sector-table" style="width: 100%; max-width: 1100px; margin: 0 auto; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
         <thead>
             <tr style="background-color: #4a5568; color: white;">
                 <th class="sortable" data-col="0">Sector <span class="sort-arrow">⇅</span></th>
-                {header_cells}
+                {"".join(header_cells)}
             </tr>
         </thead>
         <tbody>
@@ -366,6 +386,12 @@ full_html = f"""
         }}
         #sector-table td.industry-cell {{
             text-align: left;
+        }}
+        #sector-table td.current-cell {{
+            background-color: #e8e8e8 !important;
+        }}
+        #sector-table th.current-header {{
+            background-color: #3a4558;
         }}
         .sector-link {{
             color: #2563eb;
@@ -444,7 +470,7 @@ full_html = f"""
             rows.forEach((row, index) => {{
                 // Apply cell background colors based on data-value
                 Array.from(row.cells).forEach((cell, cellIndex) => {{
-                    if (cellIndex > 0) {{
+                    if (cellIndex > 0 && !cell.classList.contains('current-cell')) {{
                         const val = parseFloat(cell.dataset.value);
                         if (isNaN(val) || cell.dataset.value === '') {{
                             cell.style.backgroundColor = '#f5f5f5';
